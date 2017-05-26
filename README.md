@@ -1,5 +1,12 @@
 # IPFUnpacker
- - Usage : ipf_unpack.exe \<IPF file\> [decrypt/encrypt/extract]
+
+Usage: ./ipf_unpack [-d|-c|-e --quiet] ipf_file <output_dir>
+
+  -d, --decrypt       decrypts an ipf file
+  -c, --encrypt       encrypts an ipf file
+  -e, --extract       extract files to dir
+  --quiet             disable output
+
 
 #### "decrypt" feature
 Decrypt feature will **replace** the encrypted IPF in argument by the decrypted one.  
@@ -14,6 +21,6 @@ Make sure not encrypting twice the same IPF.
 #### "extract" feature
 Extract takes a decrypted IPF as argument and generates a list of files.
 By default, some extension files aren't decrypted entirely ; In that case, only the MD5 of the decrypted is generated.
-You can use the optional last arguments to notify which extensions you would like to decompress. (e.g : `ipf_decrypt.exe SumAni.ipf extract lua xml` will extract only lua and xml files inside SumAni.ipf)
+You can use the optional last arguments to set an custom output directory.
 
-![HowTo](http://i.imgur.com/UJzXDZN.gif)
+Lara Maia <dev@lara.click> 2017
