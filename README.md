@@ -1,12 +1,12 @@
 # IPFUnpacker
 
-Usage: ./ipf_unpacker [-d|-c|-e --quiet] ipf_file <output_dir>
-
-  -d, --decrypt       decrypts an ipf file
-  -c, --encrypt       encrypts an ipf file
-  -e, --extract       extract files to dir
-  --quiet             disable output
-
+Usage: ./ipf_unpacker [-d|-c|-e --quiet] ipf_file <output_dir>  
+  
+  -d, --decrypt       decrypts an ipf file  
+  -c, --encrypt       encrypts an ipf file  
+  -e, --extract       extract files to dir  
+  --quiet             disable output  
+  
 
 #### "decrypt" feature
 Decrypt feature will **replace** the encrypted IPF in argument by the decrypted one.  
