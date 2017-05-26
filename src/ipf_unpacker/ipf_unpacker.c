@@ -18,7 +18,7 @@
  * along with IPFUnpacker.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "ipf_unpack.h"
+#include "ipf_unpacker.h"
 #include "dbg/dbg.h"
 #include "crc32/crc32.h"
 #include "fs/fs.h"

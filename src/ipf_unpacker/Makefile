@@ -18,7 +18,7 @@
  # along with IPFUnpacker.  If not, see <http://www.gnu.org/licenses/>.
  #
 
-TARGET := ipf_unpack
+TARGET := ipf_unpacker
 
 SRCEXT   := c
 SRCDIR   := .

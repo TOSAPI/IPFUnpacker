@@ -1,6 +1,6 @@
 # IPFUnpacker
 
-Usage: ./ipf_unpack [-d|-c|-e --quiet] ipf_file <output_dir>
+Usage: ./ipf_unpacker [-d|-c|-e --quiet] ipf_file <output_dir>
 
   -d, --decrypt       decrypts an ipf file
   -c, --encrypt       encrypts an ipf file
