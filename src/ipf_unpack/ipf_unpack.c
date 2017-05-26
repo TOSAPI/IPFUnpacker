@@ -28,14 +28,16 @@
 #include "ies.h"
 #include <libgen.h>
 #include <stdbool.h>
+#include <getopt.h>
+
 #ifndef PATH_MAX
 #define PATH_MAX 4096
 #endif
 
-char *default_decompressed_extensions[] = {"xml", "ies", "jpg", "png", "tga", "lua"};
+char *supported_extensions[] = {"xml", "ies", "jpg", "png", "tga", "lua"};
 
 
-void keys_generate (uint32_t *keys) 
+void keys_generate (uint32_t *keys)
 {
     uint8_t password[20] = {0x6F, 0x66, 0x4F, 0x31, 0x61, 0x30, 0x75, 0x65, 0x58, 0x41, 0x3F, 0x20, 0x5B, 0xFF, 0x73, 0x20, 0x68, 0x20, 0x25, 0x3F};
 
@@ -98,7 +100,7 @@ static bool process_ies (IesTable *table, void *userdata)
     }
     fprintf(output, "\n");
 
-    for (int rowId = 0; rowId < table->header->rowsCount; rowId++) 
+    for (int rowId = 0; rowId < table->header->rowsCount; rowId++)
     {
         IesRow *row = &table->rows[rowId];
         for (int cellId = 0; cellId < row->cellsCount; cellId++)
@@ -141,6 +143,7 @@ typedef struct {
     Zlib *zlib;
     char **extensions;
     size_t extensionsCount;
+    char *output;
 } IpfParams;
 static bool process_ipf (uint8_t *data, size_t dataSize, char *archive, char *filename, void *userdata)
 {
@@ -150,6 +153,7 @@ static bool process_ipf (uint8_t *data, size_t dataSize, char *archive, char *fi
     Zlib *zlib = params->zlib;
     char **extensions = params->extensions;
     size_t extensionsCount = params->extensionsCount;
+    char *output = params->output;
 
     // Check if the file is encrypted
     int crypted_extension (char *filename) {
@@ -163,15 +167,15 @@ static bool process_ipf (uint8_t *data, size_t dataSize, char *archive, char *fi
     // Check if the file is worth being decompressed
     int worth_decompress (char *filename, char **extensions, size_t extensionsCount) {
         for (int i = 0; i < extensionsCount; i++) {
-        	if (file_is_extension (filename, extensions[i])) {
-        		return true;
-        	}
+            if (file_is_extension (filename, extensions[i])) {
+                return true;
+            }
         }
 
         return false;
     }
 
-    switch (action) 
+    switch (action)
     {
         case ACTION_EXTRACT: {
             uint8_t *fileContent = data;
@@ -198,35 +202,43 @@ static bool process_ipf (uint8_t *data, size_t dataSize, char *archive, char *fi
                 goto cleanup;
             }
 
-            char targetPath[PATH_MAX] = {0};
-            char targetFullName[PATH_MAX] = {0};
-            sprintf (targetPath, "./extract/%s/%s", archive, path);
-            mkpath (targetPath);
-            sprintf (targetFullName, "%s/%s", targetPath, name);
+            char target_dir[PATH_MAX];
+            char target_path[PATH_MAX];
+
+            if(output)
+            {
+                sprintf(target_dir, "%s/%s/%s", output, archive, path);
+            } else {
+                sprintf(target_dir, "%s/%s", archive, path);
+            }
+
+            mkpath(target_dir);
+
+            sprintf(target_path, "%s/%s", target_dir, name);
 
             // If we decompressed it, write the data in the file
             if (worth_decompress (name, extensions, extensionsCount))
             {
-                if (file_is_extension (name, "ies")) {
+                if(file_is_extension(name, "ies")) {
                     // IES parser
-                    FILE *ies = fopen (targetFullName, "wb+");
+                    FILE *ies = fopen(target_path, "wb+");
                     IesParams iesParams = {.output = ies};
-                    ies_read (fileContent, fileSize, process_ies, &iesParams);
-                    fclose (ies);
+                    ies_read(fileContent, fileSize, process_ies, &iesParams);
+                    fclose(ies);
                 }
                 else {
-                    if (!(file_write (targetFullName, fileContent, fileSize))) {
-                        error ("Cannot write data to '%s'.", targetFullName);
+                    if (!(file_write(target_path, fileContent, fileSize))) {
+                        error("Cannot write data to '%s'.", target_path);
                         goto cleanup;
                     }
                 }
-            } 
+            }
             else {
                 // Write the MD5 inside the file
                 char md5[33] = {0};
                 MD5_bufferEx (data, dataSize, md5);
-                if (!(file_write (targetFullName, (uint8_t *) md5, sizeof(md5) - 1))) {
-                    error ("Cannot write md5 to '%s'.", targetFullName);
+                if (!(file_write(target_path, (uint8_t *)md5, sizeof(md5) - 1))) {
+                    error("Cannot write md5 to '%s'.", target_path);
                     goto cleanup;
                 }
             }
@@ -251,67 +263,108 @@ cleanup:
     return status;
 }
 
-int main (int argc, char **argv)
+int show_help(char **argv)
 {
-    if (argc < 3) {
-        info ("Usage : ipf_decrypt.exe <crypted IPF> <encrypt|decrypt|extract> [extensions worth decompressing...]");
-        return 1;
-    }
+    printf("Usage: %s [-d|-c|-e --quiet] ipf_file <output_dir>\n\n", argv[0]);
+    printf("  -d, --decrypt       decrypts an ipf file\n");
+    printf("  -c, --encrypt       encrypts an ipf file\n");
+    printf("  -e, --extract       extract files to dir\n");
+    printf("  --quiet             disable output\n\n");
 
-    // Initialize params
+    exit(EXIT_FAILURE);
+}
+
+int main(int argc, char **argv)
+{
+    int options;
+    int option_index = 0;
+    static int quiet_flag;
+    static char input_file[PATH_MAX];
     IpfParams params = {0};
 
-    if (strcmp (argv[2], "encrypt") == 0) {
-        params.action = ACTION_ENCRYPT;
-    }
-    else if (strcmp (argv[2], "decrypt") == 0) {
-        params.action = ACTION_DECRYPT;
-    }
-    else if (strcmp (argv[2], "extract") == 0) {
-        params.action = ACTION_EXTRACT;
-        if (!(params.zlib = calloc (1, sizeof(Zlib)))) {
-            error ("Cannot allocate zlib.");
-            return 1;
+    static struct option long_options[] =
+        {
+            {"decrypt", required_argument, NULL, 'd'},
+            {"encrypt", required_argument, NULL, 'c'},
+            {"extract", required_argument, NULL, 'e'},
+            {"quiet", no_argument, &quiet_flag, 1},
+            {NULL, no_argument, NULL, 0}
+        };
+
+    while(1)
+    {
+        options = getopt_long(argc, argv, "d:c:e:q", long_options, &option_index);
+
+        // no more options to parse
+        if(options == -1)
+        {
+            // default
+            if(argc == 1)
+            {
+                show_help(argv);
+            }
+            break;
         }
-        mkpath ("./extract");
+
+        switch(options)
+        {
+            case 'd':
+                memcpy(input_file, optarg, strlen(optarg)+1);
+                params.action = ACTION_DECRYPT;
+                break;
+            case 'c':
+                memcpy(input_file, optarg, strlen(optarg)+1);
+                params.action = ACTION_ENCRYPT;
+                break;
+            case 'e':
+                memcpy(input_file, optarg, strlen(optarg)+1);
+                params.action = ACTION_EXTRACT;
+                params.zlib = calloc(1, sizeof(Zlib));
+                break;
+            case '?':
+                // something wrong with the params.
+                // getopt_long already print the error
+                show_help(argv);
+                break;
+        }
     }
-    else {
-        error ("Unknown action '%s'", argv[2]);
-        return 1;
+
+    if(quiet_flag)
+    {
+        printf("[STUB] quiet flag unavailable for now\n");
     }
-    if (argc == 3) {
-    	// Default parameters
-    	params.extensions = default_decompressed_extensions;
-    	params.extensionsCount = sizeof(default_decompressed_extensions) / sizeof(*default_decompressed_extensions);
+
+    if(optind < argc) {
+        printf("Setting output dir to %s\n", argv[optind]);
+        params.output = argv[optind];
     } else {
-    	params.extensions = &argv[3];
-    	params.extensionsCount = argc - 3;
+        char *file_name = basename(input_file);
+        printf("Warning: Output dir not defined. Setting to %.*s dir\n", (int)strlen(file_name)-4, file_name);
     }
+
+    params.extensions = supported_extensions;
+    params.extensionsCount = sizeof(supported_extensions) / sizeof(*supported_extensions);
 
     // Read the ipf_encrypted IPF
     size_t size;
-    uint8_t *ipf;
+    uint8_t *pfile;
 
-    if (!(ipf = file_map (argv[1], &size))) {
-        error ("Cannot map the ipf '%s'", argv[1]);
+    if (!(pfile = file_map(input_file, &size))) {
+        fprintf(stderr, "Cannot map '%s'\n", input_file);
         return 1;
     }
 
-    // Parsing IPF
-    info ("Parsing IPF '%s' (%s) ...", argv[1], argv[2]);
-    if (!(ipf_read (ipf, size, process_ipf, &params))) {
-        error ("Cannot read and ipf_decrypt the file '%s'", argv[1]);
+    printf("Processing '%s'\n", input_file);
+
+    if (!(ipf_read(pfile, size, process_ipf, &params))) {
+        fprintf(stderr, "Cannot read '%s'\n", input_file);
         return 1;
     }
 
-    if (!(file_flush (argv[1], ipf, size))) {
-        error ("Cannot flush the file.");
-        return 1;
-    }
+    file_flush(input_file, pfile, size);
+    free(params.zlib);
 
-    // Cleaning
-    free (params.zlib);
-    info ("Done!");
+    printf("Done!\n");
 
     return 0;
 }

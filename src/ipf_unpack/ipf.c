@@ -44,7 +44,23 @@ typedef struct {
 } IpfInfo;
 #pragma pack (pop)
 
-bool ipf_read (uint8_t *ipf, size_t size, IpfCallback callback, void *userdata) 
+char *remove_ext(char* filename) {
+    char *retstr;
+    char *lastdot;
+
+    strcpy(retstr, filename);
+
+    lastdot = strrchr(retstr, '.');
+
+    if(lastdot != NULL)
+    {
+        *lastdot = '\0';
+    }
+
+    return retstr;
+}
+
+bool ipf_read (uint8_t *ipf, size_t size, IpfCallback callback, void *userdata)
 {
     uint8_t *header = &ipf[size-24];
     bool status = false;
@@ -59,7 +75,7 @@ bool ipf_read (uint8_t *ipf, size_t size, IpfCallback callback, void *userdata)
 
     IpfInfo *ipfInfo = (void *) &ipf[archiveHeader->filetableOffset];
     char *cursor = (void *) ipfInfo;
-    
+
     // Iterate through all the files
     for (int i = 0; i < archiveHeader->fileCount; i++, ipfInfo = (void *) cursor)
     {
@@ -77,8 +93,8 @@ bool ipf_read (uint8_t *ipf, size_t size, IpfCallback callback, void *userdata)
         memset (filename, 0, sizeof(filename));
         strncpy (filename, filename_ptr, ipfInfo->filenameLength);
 
-        if (!(callback (data, dataSize, archive, filename, userdata))) {
-            error ("callback failed for '%s:%s'", archive, filename);
+        if (!(callback (data, dataSize, remove_ext(archive), filename, userdata))) {
+            error ("callback failed for '%s:%s'", remove_ext(archive), filename);
         }
 
         cursor += sizeof(*ipfInfo);
