@@ -319,7 +319,7 @@ int main(int argc, char **argv)
             case 'e':
                 memcpy(input_file, optarg, strlen(optarg)+1);
                 params.action = ACTION_EXTRACT;
-                params.zlib = calloc(1, sizeof(Zlib));
+                params.zlib = calloc(1, sizeof(Zlib)+1);
                 break;
             case '?':
                 // something wrong with the params.
