@@ -48,6 +48,7 @@ char *remove_ext(char* filename) {
     char *retstr;
     char *lastdot;
 
+    retstr = malloc(strlen(filename)+1);
     strcpy(retstr, filename);
 
     lastdot = strrchr(retstr, '.');
