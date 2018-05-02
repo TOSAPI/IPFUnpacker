@@ -176,6 +176,7 @@ LONG WINAPI crashHandler(EXCEPTION_POINTERS *ExceptionInfo);
 #else
 #include <ucontext.h>
 #include <execinfo.h>
+#include <signal.h>
 void printTrace(void);
 void crashHandler(int sig, siginfo_t *siginfo, void *_context);
 #endif
